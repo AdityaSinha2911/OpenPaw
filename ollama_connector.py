@@ -40,6 +40,20 @@ SYSTEM_PROMPT = (
     "  [ACTION:kill_process:<pid>] - Kill a process by PID\n"
     "  [ACTION:system_info] - Get system resource usage\n"
     "  [ACTION:set_reminder:<minutes>|<text>] - Set a reminder\n\n"
+    "BROWSER ACTIONS:\n"
+    "  [ACTION:browser_youtube:<song or video name>] - Search and play a YouTube video\n"
+    "  [ACTION:browser_open:<url>] - Open any URL in the browser\n"
+    "  [ACTION:browser_search:<query>] - Search Google and return top 5 results\n"
+    "  [ACTION:browser_gmail_send:<to>|<subject>|<body>] - Send an email via Gmail (requires confirmation)\n"
+    "  [ACTION:browser_gmail_read] - Read latest inbox emails from Gmail\n"
+    "  [ACTION:browser_screenshot] - Take a screenshot of the current browser page\n"
+    "  [ACTION:browser_whatsapp:<contact>|<message>] - Send a WhatsApp message to a contact\n\n"
+    "USER PROFILE ACTIONS:\n"
+    "  [ACTION:profile_set:<key>|<value>] - Set a user preference\n"
+    "  [ACTION:profile_get:<key>] - Retrieve a stored preference\n"
+    "  [ACTION:profile_show] - Show full user profile summary\n"
+    "  [ACTION:profile_add_alias:<alias>|<full_value>] - Add a shortcut alias\n"
+    "  [ACTION:profile_add_rule:<rule>] - Add a custom behavior rule\n\n"
     "CRITICAL RULES FOR ACTION TAGS:\n"
     "  - For write_file, use | to separate path and content: [ACTION:write_file:C:\\Users\\adity\\Desktop\\file.txt|content]\n"
     "  - For move, use | to separate paths: [ACTION:move:C:\\source.txt|C:\\dest.txt]\n"
@@ -55,10 +69,11 @@ SYSTEM_PROMPT = (
 
 class OllamaConnector:
     # Model changed for better response time.
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5:3b"):
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5:3b", user_profile=None):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.chat_endpoint = f"{self.base_url}/api/chat"
+        self.user_profile = user_profile
 
     def chat(self, messages: list[dict], rag_context: str | None = None) -> str:
         """Send messages to Ollama and return the assistant reply.
@@ -76,8 +91,15 @@ class OllamaConnector:
         str
             The assistant's reply text, or an error message.
         """
-        # Build system prompt, optionally augmented with RAG context
+        # Build system prompt, optionally augmented with RAG context and user profile
         system_content = SYSTEM_PROMPT
+
+        # Inject user profile if available
+        if self.user_profile:
+            profile_section = self.user_profile.get_system_prompt_section()
+            if profile_section:
+                system_content += "\n\n" + profile_section + "\n"
+
         if rag_context:
             system_content += (
                 "\n\n--- Relevant context from past conversations ---\n"
