@@ -1,0 +1,26 @@
+# Virtual environment
+venv/
+
+# Environment config (contains secret API keys and tokens)
+config.env
+.env
+
+# Data folder (contains personal memory, logs, reminders)
+data/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temp files created by Claude/editor
+tmpclaude-*/
+nul
+C
+
+# VS Code settings (optional, your choice)
+.vscode/
+
+# Embedding/vector store files
+*.npy
+*.pkl
