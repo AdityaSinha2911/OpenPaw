@@ -16,7 +16,7 @@ Telegram (you) <---> Python Backend <---> Ollama (local LLM)
 
 - **Python 3.10+** installed and on PATH
 - **Ollama** installed and running (`ollama serve`)
-- A model pulled: `ollama pull llama3.1`
+- A model pulled: `ollama pull qwen2.5:3b`
 - A **Telegram Bot Token** from [@BotFather](https://t.me/BotFather)
 - Your **Telegram User ID** from [@userinfobot](https://t.me/userinfobot)
 
@@ -34,7 +34,7 @@ Other settings you can customize:
 | Variable | Default | Description |
 |---|---|---|
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint |
-| `OLLAMA_MODEL` | `llama3.1` | Model to use |
+| `OLLAMA_MODEL` | `qwen2.5:3b` | Model to use |
 | `DATA_DIR` | `d:/OpenPaw/data` | Where memory/logs are stored |
 | `ALLOWED_DIRS` | `~/Desktop,~/Downloads,~/Documents,d:/Projects` | Whitelisted working directories |
 | `HEARTBEAT_INTERVAL` | `5` | Minutes between proactive checks |
