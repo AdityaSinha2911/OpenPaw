@@ -54,7 +54,8 @@ SYSTEM_PROMPT = (
 
 
 class OllamaConnector:
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.1:8b"):
+    # Model changed for better response time.
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "qwen2.5:3b"):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.chat_endpoint = f"{self.base_url}/api/chat"
