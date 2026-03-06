@@ -86,7 +86,12 @@ async def run_bot():
     from scheduler import ProactiveScheduler
 
     # Initialize modules
-    ollama = OllamaConnector(base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL)
+    from browser_tools import BrowserManager
+    from user_profile import UserProfile
+
+    user_profile = UserProfile(data_dir=DATA_DIR)
+    browser = BrowserManager(data_dir=DATA_DIR)
+    ollama = OllamaConnector(base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL, user_profile=user_profile)
     memory = MemoryManager(data_dir=DATA_DIR)
 
     # Initialize RAG embedding store (if enabled)
@@ -129,6 +134,8 @@ async def run_bot():
         confirmation_timeout=CONFIRMATION_TIMEOUT,
         embedding_store=embedding_store,
         rag_top_k=RAG_TOP_K,
+        browser=browser,
+        user_profile=user_profile,
     )
 
     app = handler.build()
