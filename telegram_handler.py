@@ -51,6 +51,8 @@ from system_tools import (
     run_command,
     find_file_or_app,
 )
+from browser_tools import BrowserManager
+from user_profile import UserProfile
 
 logger = logging.getLogger("openpaw.telegram")
 
@@ -70,6 +72,8 @@ class TelegramHandler:
         confirmation_timeout: int = 30,
         embedding_store: EmbeddingStore | None = None,
         rag_top_k: int = 5,
+        browser: BrowserManager | None = None,
+        user_profile: UserProfile | None = None,
     ):
         self.token = token
         self.allowed_user_id = allowed_user_id
@@ -79,6 +83,8 @@ class TelegramHandler:
         self.command_timeout = command_timeout
         self.embedding_store = embedding_store
         self.rag_top_k = rag_top_k
+        self.browser = browser
+        self.user_profile = user_profile
 
         self.confirm = ConfirmationManager(timeout=confirmation_timeout)
         self.app: Application | None = None
@@ -249,6 +255,14 @@ class TelegramHandler:
                 await self._send(update, result, context=context)
             return
 
+        # Resolve aliases before processing
+        if self.user_profile:
+            text = self.user_profile.resolve_aliases(text)
+
+        # Passive profile learning
+        if self.user_profile:
+            self.user_profile.learn_from_message(text)
+
         # Add user message to memory
         self.memory.add_message(user_id, "user", text)
 
@@ -304,6 +318,10 @@ class TelegramHandler:
         args_str = parts[1] if len(parts) > 1 else ""
 
         logger.info("Action: %s | Args: %s", action_name, args_str)
+
+        # Try browser / profile actions first
+        if await self._handle_browser_action(update, context, action_name, args_str, user_id):
+            return
 
         # ---------- Non-destructive actions (execute immediately) ----------
 
@@ -499,8 +517,140 @@ class TelegramHandler:
             await self._send(update, f"Unknown action: {action_name}", context=context)
 
     # ------------------------------------------------------------------
-    # Bot lifecycle
+    # Browser action helpers
     # ------------------------------------------------------------------
+    async def _handle_browser_action(
+        self, update, context, action_name: str, args_str: str, user_id: int
+    ) -> bool:
+        """Handle browser_* and profile_* action tags. Returns True if handled."""
+        if not action_name.startswith("browser_") and not action_name.startswith("profile_"):
+            return False
+
+        # --- Browser actions ---
+        if action_name == "browser_youtube":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            result = await self.browser.youtube_search_play(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "browser_open":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            result = await self.browser.open_url(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "browser_search":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            result = await self.browser.google_search(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "browser_gmail_send":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            parts = args_str.split("|", 2)
+            if len(parts) != 3:
+                await self._send(update, "Invalid gmail_send format. Use: to|subject|body", context=context)
+                return True
+            to, subject, body = parts[0].strip(), parts[1].strip(), parts[2].strip()
+
+            async def do_gmail_send():
+                return await self.browser.gmail_send(to, subject, body)
+
+            await self.confirm.request_confirmation(
+                user_id,
+                f"Send email to {to} with subject '{subject}'",
+                do_gmail_send,
+                self.send_to_user,
+            )
+            return True
+
+        elif action_name == "browser_gmail_read":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            result = await self.browser.gmail_read()
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "browser_screenshot":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            result = await self.browser.take_screenshot()
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "browser_whatsapp":
+            if not self.browser:
+                await self._send(update, "Browser module is not available.", context=context)
+                return True
+            parts = args_str.split("|", 1)
+            if len(parts) != 2:
+                await self._send(update, "Invalid whatsapp format. Use: contact|message", context=context)
+                return True
+            contact, message = parts[0].strip(), parts[1].strip()
+            result = await self.browser.whatsapp_send(contact, message)
+            await self._send(update, result, context=context)
+            return True
+
+        # --- Profile actions ---
+        elif action_name == "profile_set":
+            if not self.user_profile:
+                await self._send(update, "User profile module is not available.", context=context)
+                return True
+            parts = args_str.split("|", 1)
+            if len(parts) != 2:
+                await self._send(update, "Invalid profile_set format. Use: key|value", context=context)
+                return True
+            result = self.user_profile.set_preference(parts[0].strip(), parts[1].strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "profile_get":
+            if not self.user_profile:
+                await self._send(update, "User profile module is not available.", context=context)
+                return True
+            result = self.user_profile.get_preference(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "profile_show":
+            if not self.user_profile:
+                await self._send(update, "User profile module is not available.", context=context)
+                return True
+            result = self.user_profile.show_profile()
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "profile_add_alias":
+            if not self.user_profile:
+                await self._send(update, "User profile module is not available.", context=context)
+                return True
+            parts = args_str.split("|", 1)
+            if len(parts) != 2:
+                await self._send(update, "Invalid alias format. Use: alias|full_value", context=context)
+                return True
+            result = self.user_profile.add_alias(parts[0].strip(), parts[1].strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "profile_add_rule":
+            if not self.user_profile:
+                await self._send(update, "User profile module is not available.", context=context)
+                return True
+            result = self.user_profile.add_rule(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        return False
     def build(self) -> Application:
         """Build and return the telegram Application."""
         self.app = (
