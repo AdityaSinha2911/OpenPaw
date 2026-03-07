@@ -53,6 +53,8 @@ from system_tools import (
 )
 from browser_tools import BrowserManager
 from user_profile import UserProfile
+from gmail_tools import GmailTools
+from calendar_tools import CalendarTools
 
 logger = logging.getLogger("openpaw.telegram")
 
@@ -74,6 +76,8 @@ class TelegramHandler:
         rag_top_k: int = 5,
         browser: BrowserManager | None = None,
         user_profile: UserProfile | None = None,
+        gmail: GmailTools | None = None,
+        calendar: CalendarTools | None = None,
     ):
         self.token = token
         self.allowed_user_id = allowed_user_id
@@ -85,6 +89,8 @@ class TelegramHandler:
         self.rag_top_k = rag_top_k
         self.browser = browser
         self.user_profile = user_profile
+        self.gmail = gmail
+        self.calendar = calendar
 
         self.confirm = ConfirmationManager(timeout=confirmation_timeout)
         self.app: Application | None = None
@@ -319,6 +325,12 @@ class TelegramHandler:
 
         logger.info("Action: %s | Args: %s", action_name, args_str)
 
+        # Try Gmail / Calendar actions first
+        if await self._handle_gmail_action(update, context, action_name, args_str, user_id):
+            return
+        if await self._handle_calendar_action(update, context, action_name, args_str, user_id):
+            return
+
         # Try browser / profile actions first
         if await self._handle_browser_action(update, context, action_name, args_str, user_id):
             return
@@ -515,6 +527,236 @@ class TelegramHandler:
 
         else:
             await self._send(update, f"Unknown action: {action_name}", context=context)
+
+    # ------------------------------------------------------------------
+    # Gmail action handlers
+    # ------------------------------------------------------------------
+    async def _handle_gmail_action(
+        self, update, context, action_name: str, args_str: str, user_id: int
+    ) -> bool:
+        """Handle gmail_* action tags. Returns True if handled."""
+        if not action_name.startswith("gmail_"):
+            return False
+
+        if not self.gmail:
+            await self._send(update, "Gmail module is not available. Run: python auth_google.py", context=context)
+            return True
+
+        if not self.gmail.is_authenticated():
+            await self._send(update, "Gmail is not authenticated. Run: python auth_google.py", context=context)
+            return True
+
+        if action_name == "gmail_read":
+            count = 5
+            if args_str.strip().isdigit():
+                count = int(args_str.strip())
+            result = await self.gmail.read_emails(count)
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "gmail_read_unread":
+            result = await self.gmail.read_unread()
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "gmail_search":
+            result = await self.gmail.search_emails(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "gmail_summarize":
+            count = 5
+            if args_str.strip().isdigit():
+                count = int(args_str.strip())
+            result = await self.gmail.summarize_emails(count)
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "gmail_send":
+            parts = args_str.split("|", 2)
+            if len(parts) != 3:
+                await self._send(update, "Invalid gmail_send format. Use: to|subject|body", context=context)
+                return True
+            to, subject, body = parts[0].strip(), parts[1].strip(), parts[2].strip()
+
+            async def do_gmail_send():
+                return await self.gmail.send_email(to, subject, body)
+
+            await self.confirm.request_confirmation(
+                user_id,
+                f"Send email to {to} with subject '{subject}'",
+                do_gmail_send,
+                self.send_to_user,
+            )
+            return True
+
+        elif action_name == "gmail_reply":
+            parts = args_str.split("|", 1)
+            if len(parts) != 2:
+                await self._send(update, "Invalid gmail_reply format. Use: message_id|body", context=context)
+                return True
+            msg_id, body = parts[0].strip(), parts[1].strip()
+
+            async def do_gmail_reply():
+                return await self.gmail.reply_email(msg_id, body)
+
+            await self.confirm.request_confirmation(
+                user_id,
+                f"Reply to email {msg_id}",
+                do_gmail_reply,
+                self.send_to_user,
+            )
+            return True
+
+        elif action_name == "gmail_mark_read":
+            result = await self.gmail.mark_read(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "gmail_delete":
+            msg_id = args_str.strip()
+
+            async def do_gmail_delete():
+                return await self.gmail.delete_email(msg_id)
+
+            await self.confirm.request_confirmation(
+                user_id,
+                f"Delete email {msg_id}",
+                do_gmail_delete,
+                self.send_to_user,
+            )
+            return True
+
+        elif action_name == "gmail_full":
+            result = await self.gmail.read_full(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        return False
+
+    # ------------------------------------------------------------------
+    # Calendar action handlers
+    # ------------------------------------------------------------------
+    async def _handle_calendar_action(
+        self, update, context, action_name: str, args_str: str, user_id: int
+    ) -> bool:
+        """Handle cal_* action tags. Returns True if handled."""
+        if not action_name.startswith("cal_"):
+            return False
+
+        if not self.calendar:
+            await self._send(update, "Calendar module is not available. Run: python auth_google.py", context=context)
+            return True
+
+        if not self.calendar.is_authenticated():
+            await self._send(update, "Calendar is not authenticated. Run: python auth_google.py", context=context)
+            return True
+
+        if action_name == "cal_today":
+            result = await self.calendar.get_today_events()
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_week":
+            result = await self.calendar.get_week_events()
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_date":
+            result = await self.calendar.get_date_events(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_create":
+            parts = args_str.split("|")
+            if len(parts) < 4:
+                await self._send(
+                    update,
+                    "Invalid cal_create format. Use: title|date|time|duration_minutes|description",
+                    context=context,
+                )
+                return True
+            title = parts[0].strip()
+            date = parts[1].strip()
+            time_str = parts[2].strip()
+            try:
+                duration = int(parts[3].strip())
+            except ValueError:
+                duration = 60
+            description = parts[4].strip() if len(parts) > 4 else ""
+            result = await self.calendar.create_event(title, date, time_str, duration, description)
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_create_allday":
+            parts = args_str.split("|")
+            if len(parts) < 2:
+                await self._send(
+                    update,
+                    "Invalid format. Use: title|date|description",
+                    context=context,
+                )
+                return True
+            title = parts[0].strip()
+            date = parts[1].strip()
+            description = parts[2].strip() if len(parts) > 2 else ""
+            result = await self.calendar.create_allday_event(title, date, description)
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_update":
+            parts = args_str.split("|", 2)
+            if len(parts) != 3:
+                await self._send(
+                    update,
+                    "Invalid cal_update format. Use: event_id|field|new_value",
+                    context=context,
+                )
+                return True
+            event_id, field, new_value = parts[0].strip(), parts[1].strip(), parts[2].strip()
+            result = await self.calendar.update_event(event_id, field, new_value)
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_delete":
+            event_id = args_str.strip()
+
+            async def do_cal_delete():
+                return await self.calendar.delete_event(event_id)
+
+            await self.confirm.request_confirmation(
+                user_id,
+                f"Delete calendar event {event_id}",
+                do_cal_delete,
+                self.send_to_user,
+            )
+            return True
+
+        elif action_name == "cal_remind":
+            parts = args_str.split("|", 1)
+            if len(parts) != 2:
+                await self._send(
+                    update,
+                    "Invalid format. Use: event_id|minutes_before",
+                    context=context,
+                )
+                return True
+            event_id = parts[0].strip()
+            try:
+                minutes = int(parts[1].strip())
+            except ValueError:
+                await self._send(update, "Invalid minutes value.", context=context)
+                return True
+            result = await self.calendar.set_reminder(event_id, minutes)
+            await self._send(update, result, context=context)
+            return True
+
+        elif action_name == "cal_natural":
+            result = await self.calendar.create_from_natural_language(args_str.strip())
+            await self._send(update, result, context=context)
+            return True
+
+        return False
 
     # ------------------------------------------------------------------
     # Browser action helpers
