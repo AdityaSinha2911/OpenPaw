@@ -88,11 +88,36 @@ async def run_bot():
     # Initialize modules
     from browser_tools import BrowserManager
     from user_profile import UserProfile
+    from gmail_tools import GmailTools
+    from calendar_tools import CalendarTools
 
     user_profile = UserProfile(data_dir=DATA_DIR)
     browser = BrowserManager(data_dir=DATA_DIR)
     ollama = OllamaConnector(base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL, user_profile=user_profile)
     memory = MemoryManager(data_dir=DATA_DIR)
+
+    # Initialize Google API modules (Gmail & Calendar)
+    gmail = None
+    calendar = None
+    try:
+        gmail = GmailTools(data_dir=DATA_DIR, ollama_connector=ollama)
+        if gmail.is_authenticated():
+            logger.info("Gmail API initialized and authenticated")
+        else:
+            logger.warning("Gmail token not found or invalid — run: python auth_google.py")
+            gmail = None
+    except Exception as exc:
+        logger.warning("Failed to initialize Gmail: %s", exc)
+
+    try:
+        calendar = CalendarTools(data_dir=DATA_DIR, ollama_connector=ollama)
+        if calendar.is_authenticated():
+            logger.info("Calendar API initialized and authenticated (timezone: %s)", calendar.timezone)
+        else:
+            logger.warning("Calendar token not found or invalid — run: python auth_google.py")
+            calendar = None
+    except Exception as exc:
+        logger.warning("Failed to initialize Calendar: %s", exc)
 
     # Initialize RAG embedding store (if enabled)
     embedding_store = None
@@ -136,6 +161,8 @@ async def run_bot():
         rag_top_k=RAG_TOP_K,
         browser=browser,
         user_profile=user_profile,
+        gmail=gmail,
+        calendar=calendar,
     )
 
     app = handler.build()
@@ -170,6 +197,8 @@ async def run_bot():
         heartbeat_interval=HEARTBEAT_INTERVAL,
         battery_threshold=BATTERY_ALERT_THRESHOLD,
         watch_folders=watch_folders,
+        gmail=gmail,
+        calendar=calendar,
     )
 
     # Start the bot with long polling
@@ -193,6 +222,10 @@ async def run_bot():
         if embedding_store:
             rag_status += f" ({EMBED_MODEL}, {embedding_store.get_entry_count()} entries)"
         print(f"  RAG:         {rag_status}")
+        gmail_status = "enabled" if gmail else "disabled (run: python auth_google.py)"
+        calendar_status = "enabled" if calendar else "disabled (run: python auth_google.py)"
+        print(f"  Gmail:       {gmail_status}")
+        print(f"  Calendar:    {calendar_status}")
         print("  Press Ctrl+C to stop.\n")
 
         # Start polling
