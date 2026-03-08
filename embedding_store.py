@@ -38,9 +38,7 @@ class EmbeddingStore:
 
         self._load()
 
-    # ------------------------------------------------------------------
     # Persistence
-    # ------------------------------------------------------------------
     def _load(self) -> None:
         if os.path.exists(self._store_path):
             try:
@@ -66,9 +64,7 @@ class EmbeddingStore:
         except Exception as exc:
             logger.error("Failed to save embeddings: %s", exc)
 
-    # ------------------------------------------------------------------
     # Ollama embedding API
-    # ------------------------------------------------------------------
     def embed_text(self, text: str) -> np.ndarray | None:
         """Generate an embedding vector for *text* using Ollama."""
         try:
@@ -97,9 +93,7 @@ class EmbeddingStore:
             logger.warning("Unexpected embedding error: %s", exc)
             return None
 
-    # ------------------------------------------------------------------
     # Store entries
-    # ------------------------------------------------------------------
     def add_entry(
         self, user_id: int, role: str, content: str, timestamp: float
     ) -> None:
@@ -124,9 +118,7 @@ class EmbeddingStore:
 
         self._save()
 
-    # ------------------------------------------------------------------
     # Search
-    # ------------------------------------------------------------------
     def search(
         self,
         query_embedding: np.ndarray,
@@ -167,9 +159,7 @@ class EmbeddingStore:
             return []
         return self.search(embedding, **kwargs)
 
-    # ------------------------------------------------------------------
     # Backfill existing history
-    # ------------------------------------------------------------------
     def backfill_from_history(self, history: dict[str, list[dict]]) -> int:
         """Import existing conversation history into the embedding store.
 
@@ -194,9 +184,7 @@ class EmbeddingStore:
 
         return count
 
-    # ------------------------------------------------------------------
     # Utilities
-    # ------------------------------------------------------------------
     def get_entry_count(self) -> int:
         return len(self._entries)
 
