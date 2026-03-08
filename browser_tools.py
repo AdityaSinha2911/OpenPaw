@@ -52,9 +52,9 @@ class BrowserManager:
         self._browser_context = None
         self._page = None
 
-    # ------------------------------------------------------------------
+
     # Lifecycle
-    # ------------------------------------------------------------------
+
     async def _ensure_browser(self):
         """Launch the browser if not already running."""
         if self._page and not self._page.is_closed():
@@ -101,9 +101,7 @@ class BrowserManager:
         await self._ensure_browser()
         return self._page
 
-    # ------------------------------------------------------------------
     # General Web
-    # ------------------------------------------------------------------
     async def open_url(self, url: str) -> str:
         """Open a URL in the browser."""
         if _is_blocked_url(url):
@@ -155,9 +153,7 @@ class BrowserManager:
             logger.error("Fill failed for '%s': %s", selector, exc)
             return f"Error filling form: {exc}"
 
-    # ------------------------------------------------------------------
     # Google Search
-    # ------------------------------------------------------------------
     async def google_search(self, query: str) -> str:
         """Search Google and return top 5 results."""
         try:
@@ -184,9 +180,7 @@ class BrowserManager:
             logger.error("Google search failed: %s", exc)
             return f"Error searching Google: {exc}"
 
-    # ------------------------------------------------------------------
     # YouTube
-    # ------------------------------------------------------------------
     async def youtube_search_play(self, query: str) -> str:
         try:
             p = await self.page
@@ -255,9 +249,7 @@ class BrowserManager:
             logger.error("YouTube skip failed: %s", exc)
             return f"Error skipping video: {exc}"
 
-    # ------------------------------------------------------------------
     # Gmail
-    # ------------------------------------------------------------------
     async def gmail_send(self, to: str, subject: str, body: str) -> str:
         """Compose and send an email via Gmail web interface.
 
@@ -345,9 +337,7 @@ class BrowserManager:
             logger.error("Gmail search failed: %s", exc)
             return f"Error searching Gmail: {exc}"
 
-    # ------------------------------------------------------------------
     # WhatsApp Web
-    # ------------------------------------------------------------------
     async def whatsapp_send(self, contact: str, message: str) -> str:
         """Send a WhatsApp message to a contact by name via WhatsApp Web."""
         try:
