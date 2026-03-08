@@ -48,9 +48,7 @@ class CalendarTools:
         self._service = None
         self.timezone = _get_local_timezone()
 
-    # ------------------------------------------------------------------
     # Authentication
-    # ------------------------------------------------------------------
     def _get_service(self):
         """Build or return a cached Calendar API service."""
         if self._service is not None:
@@ -93,9 +91,7 @@ class CalendarTools:
         except Exception:
             return False
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
     def _run_sync(self, func, *args, **kwargs):
         """Run a synchronous function in the default executor."""
         loop = asyncio.get_event_loop()
@@ -141,9 +137,7 @@ class CalendarTools:
 
         return "\n".join(lines)
 
-    # ------------------------------------------------------------------
     # View events
-    # ------------------------------------------------------------------
     def _get_events_sync(self, time_min: str, time_max: str) -> str:
         """Get events in a time range (synchronous)."""
         try:
@@ -224,9 +218,7 @@ class CalendarTools:
         except Exception:
             return "Z"
 
-    # ------------------------------------------------------------------
     # Create events
-    # ------------------------------------------------------------------
     def _create_event_sync(self, title: str, date: str, time_str: str,
                            duration_minutes: int = 60, description: str = "",
                            location: str = "") -> str:
@@ -284,9 +276,7 @@ class CalendarTools:
             self._create_event_sync, title, date, time_str, duration_minutes, description
         )
 
-    # ------------------------------------------------------------------
     # Create all-day events
-    # ------------------------------------------------------------------
     def _create_allday_sync(self, title: str, date: str, description: str = "") -> str:
         """Create an all-day event (synchronous)."""
         try:
@@ -328,9 +318,7 @@ class CalendarTools:
         """Create an all-day event."""
         return await self._run_sync(self._create_allday_sync, title, date, description)
 
-    # ------------------------------------------------------------------
     # Update events
-    # ------------------------------------------------------------------
     def _update_event_sync(self, event_id: str, field: str, new_value: str) -> str:
         """Update a specific field of a calendar event (synchronous)."""
         try:
@@ -403,9 +391,7 @@ class CalendarTools:
         """Update a specific field of a calendar event."""
         return await self._run_sync(self._update_event_sync, event_id, field, new_value)
 
-    # ------------------------------------------------------------------
     # Delete events
-    # ------------------------------------------------------------------
     def _delete_event_sync(self, event_id: str) -> str:
         """Delete a calendar event (synchronous)."""
         try:
@@ -426,9 +412,7 @@ class CalendarTools:
         """Delete a calendar event."""
         return await self._run_sync(self._delete_event_sync, event_id)
 
-    # ------------------------------------------------------------------
     # Set reminder
-    # ------------------------------------------------------------------
     def _set_reminder_sync(self, event_id: str, minutes_before: int) -> str:
         """Set a popup reminder on an event (synchronous)."""
         try:
@@ -463,9 +447,7 @@ class CalendarTools:
         """Set a popup reminder on an event."""
         return await self._run_sync(self._set_reminder_sync, event_id, minutes_before)
 
-    # ------------------------------------------------------------------
     # Natural language event creation (via Ollama)
-    # ------------------------------------------------------------------
     async def create_from_natural_language(self, text: str) -> str:
         """Parse natural language with Ollama and create an event."""
         if not self.ollama:
@@ -518,9 +500,7 @@ class CalendarTools:
             logger.error("Error in natural language event creation: %s", exc)
             return f"Error creating event from natural language: {exc}"
 
-    # ------------------------------------------------------------------
     # Upcoming events (used by scheduler)
-    # ------------------------------------------------------------------
     def _get_upcoming_sync(self, minutes_ahead: int = 45) -> list[dict]:
         """Get events starting within the next N minutes (synchronous)."""
         try:
@@ -564,9 +544,7 @@ class CalendarTools:
         """Get events starting within the next N minutes."""
         return await self._run_sync(self._get_upcoming_sync, minutes_ahead)
 
-    # ------------------------------------------------------------------
     # Today's event count (used by scheduler for morning briefing)
-    # ------------------------------------------------------------------
     def _get_today_count_sync(self) -> int:
         """Get count of today's events (synchronous)."""
         try:
